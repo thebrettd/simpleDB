@@ -6,9 +6,11 @@ import java.util.*;
 public class SimpleDatabase{
 
     private Map<String,Stack<Integer>> variableToValueMap;
+    private Map<Integer, Stack<ArrayList<String>>> valueToVariableMap;
     private int transactionCount;
 
     public SimpleDatabase(){
+        valueToVariableMap = new TreeMap<Integer,Stack<ArrayList<String>>>();
         variableToValueMap = new TreeMap<String,Stack<Integer>>();
         transactionCount = 0;
     }
@@ -50,6 +52,38 @@ public class SimpleDatabase{
     }
 
     public void set(String variableName, Integer value){
+        setVariableToValueMap(variableName, value);
+        setValueToVariableMap(variableName, value);
+    }
+
+    private void setValueToVariableMap(String variableName, Integer value) {
+        Stack<ArrayList<String>> values = valueToVariableMap.get(value);
+        if (values == null){
+            values = new Stack<ArrayList<String>>();
+            for (int i=0;i<transactionCount;i++){
+                values.push(null);
+            }
+            ArrayList<String> valuesInCurrTransaction = new ArrayList<String>();
+            valuesInCurrTransaction.add(variableName);
+            values.push(valuesInCurrTransaction);
+            valueToVariableMap.put(value,values);
+        }else {
+            if (values.size() < transactionCount+1){
+                for(int i=0;i<values.size();i++){
+                    ArrayList<String> valuesInOldTransaction = values.peek();
+                    values.push(valuesInOldTransaction);
+                }
+                ArrayList<String> valuesInCurrentTransaction = values.peek();
+                valuesInCurrentTransaction.add(variableName);
+                values.push(valuesInCurrentTransaction);
+            }else if(values.size() == transactionCount +1){
+                ArrayList<String> valuesInCurrTransaction = values.peek();
+                valuesInCurrTransaction.add(variableName);
+            }
+        }
+    }
+
+    private void setVariableToValueMap(String variableName, Integer value) {
         Stack<Integer> values = variableToValueMap.get(variableName);
         if (values == null){
             values = new Stack<Integer>();
@@ -65,7 +99,12 @@ public class SimpleDatabase{
 
         if(variableToValueMap.containsKey(variableName)){
             Stack<Integer> values = variableToValueMap.get(variableName);
-            return new GetResult(values.peek());
+            try{
+                return new GetResult(values.peek());
+            }catch(EmptyStackException e){
+                return new GetResult();
+            }
+
         }else{
             return new GetResult();
         }
@@ -73,7 +112,29 @@ public class SimpleDatabase{
 
 
     public void unset(String variableName) {
+        unsetValueToVariableMap(variableName); //Do this first, because it has a dependency on variableToValueMap data
+        unsetVariableToValueMap(variableName);
+    }
 
+    private void unsetValueToVariableMap(String variableName) {
+        GetResult getResult = get(variableName);
+        if ((getResult.toString().equals("NULL"))){
+            //Variable not set, nothing to do
+        }else{
+            Stack<ArrayList<String>> variablesWithValue = valueToVariableMap.get(Integer.parseInt(getResult.toString()));
+            if(variablesWithValue.size() < transactionCount + 1){
+                for(int i=variablesWithValue.size();i<transactionCount+1 ;i++){
+                    variablesWithValue.push(new ArrayList<String>(variablesWithValue.peek()));
+                }
+            }
+
+            ArrayList<String> variablesWithValueInTransaction = variablesWithValue.pop();
+            variablesWithValueInTransaction.remove(variableName);
+            variablesWithValue.push(variablesWithValueInTransaction);
+        }
+    }
+
+    private void unsetVariableToValueMap(String variableName) {
         Stack<Integer> values = variableToValueMap.get(variableName);
         if (values != null){
             if (values.size() == transactionCount + 1){
@@ -90,16 +151,14 @@ public class SimpleDatabase{
     }
 
     public Integer numEqualTo(Integer valueToFind){
-        int numFound = 0;
-
-        Integer currVal;
-        for(Stack<Integer> valueList : variableToValueMap.values()){
-            currVal = valueList.peek();
-            if (currVal != null && currVal.equals(valueToFind)){
-                numFound++;
-            }
+        Stack<ArrayList<String>> arrayLists = valueToVariableMap.get(valueToFind);
+        if (arrayLists != null){
+            ArrayList<String> currTransactionCounts = arrayLists.peek();
+            return currTransactionCounts.size();
+        }else{
+            return 0;
         }
-        return numFound;
+
     }
 
     public void begin(){
@@ -110,13 +169,27 @@ public class SimpleDatabase{
         if (transactionCount == 0){
             System.out.println("NO TRANSACTION");
         }else{
-            for(String variable : variableToValueMap.keySet()){
-                Stack<Integer> values = variableToValueMap.get(variable);
-                if (values != null && values.size() > transactionCount){
-                    values.pop();
-                }
-            }
+            rollbackVariableToValueMap();
+            rollbackValueToVariableMap();
             transactionCount--;
+        }
+    }
+
+    private void rollbackValueToVariableMap() {
+        for(Integer value : valueToVariableMap.keySet()){
+            Stack<ArrayList<String>> variablesWithValue = valueToVariableMap.get(value);
+            if (variablesWithValue != null && variablesWithValue.size() > transactionCount){
+                variablesWithValue.pop();
+            }
+        }
+    }
+
+    private void rollbackVariableToValueMap() {
+        for(String variable : variableToValueMap.keySet()){
+            Stack<Integer> values = variableToValueMap.get(variable);
+            if (values != null && values.size() > transactionCount){
+                values.pop();
+            }
         }
     }
 
@@ -125,20 +198,33 @@ public class SimpleDatabase{
             System.out.println("NO TRANSACTION");
         }else{
             transactionCount = 0;
-            for(String key : variableToValueMap.keySet()){
-                Stack<Integer> valuesForKey = variableToValueMap.get(key);
-                if (valuesForKey != null){
-                    Integer valueToCommit = valuesForKey.pop();
-                        if (valueToCommit != null){
-                            Stack<Integer> newValues = new Stack<Integer>();
-                            newValues.push(valueToCommit);
-                            variableToValueMap.put(key,newValues);
-                        }
-                }
-
-            }
+            commitVariableToValueMap();
+            commitValueToVariableMap();
         }
+    }
 
+    private void commitValueToVariableMap() {
+        for(Integer value : valueToVariableMap.keySet()){
+            Stack<ArrayList<String>> committedValues = new Stack<ArrayList<String>>();
+            ArrayList<String> valuesToCommit = valueToVariableMap.get(value).peek();
+            committedValues.push(valuesToCommit);
+            valueToVariableMap.put(value,committedValues);
+        }
+    }
+
+    private void commitVariableToValueMap() {
+        for(String key : variableToValueMap.keySet()){
+            Stack<Integer> valuesForKey = variableToValueMap.get(key);
+            if (valuesForKey != null){
+                Integer valueToCommit = valuesForKey.pop();
+                    if (valueToCommit != null){
+                        Stack<Integer> newValues = new Stack<Integer>();
+                        newValues.push(valueToCommit);
+                        variableToValueMap.put(key,newValues);
+                    }
+            }
+
+        }
     }
 
     public class GetResult{
