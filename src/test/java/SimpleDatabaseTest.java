@@ -104,7 +104,32 @@ public class SimpleDatabaseTest {
     }
 
     @Test
-    public void testCase1(){
+    public void transactionTestCase1(){
+        myTestDatabase.begin();
+        myTestDatabase.set("a",10);
+        assertTrue(myTestDatabase.get("a").toString().equals("10"));
+        myTestDatabase.begin();
+        myTestDatabase.set("a",20);
+        assertTrue(myTestDatabase.get("a").toString().equals("20"));
+        myTestDatabase.rollback();
+        assertTrue(myTestDatabase.get("a").toString().equals("10"));
+        myTestDatabase.rollback();
+        assertTrue(myTestDatabase.get("a").toString().equals("NULL"));
+    }
+
+    @Test
+    public void transactionTestCase2(){
+        myTestDatabase.begin();
+        myTestDatabase.set("a",30);
+        myTestDatabase.begin();
+        myTestDatabase.set("a",40);
+        myTestDatabase.commit();
+        assertTrue(myTestDatabase.get("a").toString().equals("40"));
+        myTestDatabase.rollback();
+    }
+
+    @Test
+    public void transactionTestCase3(){
         myTestDatabase.set("A",50);
         myTestDatabase.begin();
         assertTrue(myTestDatabase.get("A").toString().equals("50"));

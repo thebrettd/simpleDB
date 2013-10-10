@@ -26,18 +26,25 @@ public class SimpleDatabase{
             try {
                 String input = br.readLine();
                 String[] inputs = input.split(" ");
-                switch(Operations.valueOf(inputs[0])){
-                    case SET: myDatabase.set(inputs[1],Integer.parseInt(inputs[2])); break;
-                    case UNSET: myDatabase.unset(inputs[1]); break;
-                    case GET:
-                        System.out.println(myDatabase.get(inputs[1])); break;
-                    case NUMEQUALTO: myDatabase.numEqualTo(Integer.parseInt(inputs[1])); break;
-                    case BEGIN: myDatabase.begin(); break;
-                    case COMMIT: myDatabase.commit(); break;
-                    case ROLLBACK: myDatabase.rollback(); break;
-                    case END: myDatabase.end(); break;
-                    default:
-                        System.out.println("Unknown operation " + inputs[0]);
+
+                Operations operation;
+                try{
+                   operation = Operations.valueOf(inputs[0]);
+                    switch(operation){
+                        case SET: myDatabase.set(inputs[1],Integer.parseInt(inputs[2])); break;
+                        case UNSET: myDatabase.unset(inputs[1]); break;
+                        case GET:
+                            System.out.println(myDatabase.get(inputs[1])); break;
+                        case NUMEQUALTO: System.out.println(myDatabase.numEqualTo(Integer.parseInt(inputs[1]))); break;
+                        case BEGIN: myDatabase.begin(); break;
+                        case COMMIT: myDatabase.commit(); break;
+                        case ROLLBACK: myDatabase.rollback(); break;
+                        case END: myDatabase.end(); break;
+                        default:
+                            System.out.println("Unknown operation " + inputs[0]);
+                    }
+                }catch(IllegalArgumentException e){
+                    System.out.println("Invalid operation entered");
                 }
             } catch (IOException e) {
                 System.out.println("Error reading operation from stdin");
