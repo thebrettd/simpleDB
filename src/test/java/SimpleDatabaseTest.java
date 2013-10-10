@@ -155,4 +155,15 @@ public class SimpleDatabaseTest {
         assertTrue(myTestDatabase.numEqualTo(10) == 1);
     }
 
+    @Test
+    public void testCommitFromAllOpenTransactions(){
+        myTestDatabase.begin();
+        myTestDatabase.set("a",10);
+        myTestDatabase.begin();
+        myTestDatabase.set("b",20);
+        myTestDatabase.commit();
+        assertTrue(myTestDatabase.get("a").toString().equals("10"));
+        assertTrue(myTestDatabase.get("b").toString().equals("20"));
+    }
+
 }

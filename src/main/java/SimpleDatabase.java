@@ -10,8 +10,10 @@ public class SimpleDatabase{
     private int transactionCount;
 
     public SimpleDatabase(){
+        //Map from a given Integer value to a list of variables that all share the same value.
         valueToVariableMap = new TreeMap<Integer,Stack<ArrayList<String>>>();
-        variableToValueMap = new TreeMap<String,Stack<Integer>>();
+        //Map from a given String variable to its value
+        variableToValueMap = new HashMap<String,Stack<Integer>>();
         transactionCount = 0;
     }
 
@@ -58,11 +60,29 @@ public class SimpleDatabase{
         System.exit(0);
     }
 
+    /***
+     * Set the value in both data structures
+     * O(log n)
+     *
+     * @param variableName
+     * @param value
+     */
     public void set(String variableName, Integer value){
         setVariableToValueMap(variableName, value);
         setValueToVariableMap(variableName, value);
     }
 
+    /***
+     * Set the value in the valueToVariable map.
+     * O(log n) with respect to the number of items in the database, because it fetches the value using a TreeMap.
+     *
+     *  Note: at worst case this is linear with respect to the number of open transactions,because it may need to
+     *  push a value onto the stack for each previous transaction where the value was not touched. The number of
+     *  open transactions is assumed to be small.
+     *
+     * @param variableName
+     * @param value
+     */
     private void setValueToVariableMap(String variableName, Integer value) {
         Stack<ArrayList<String>> values = valueToVariableMap.get(value);
         if (values == null){
@@ -90,6 +110,17 @@ public class SimpleDatabase{
         }
     }
 
+    /***
+     * Set the value in the variableToValue map
+     * O(c) with respect to the number of items in the database, because it fetches the value using a hashMap.
+     *
+     *  Note: at worst case this is linear with respect to the number of open transactions,because it may need to
+     *  push a value onto the stack for each previous transaction where the value was not touched. The number of
+     *  open transactions is assumed to be small.
+     *
+     * @param variableName
+     * @param value
+     */
     private void setVariableToValueMap(String variableName, Integer value) {
         Stack<Integer> values = variableToValueMap.get(variableName);
         if (values == null){
@@ -102,6 +133,13 @@ public class SimpleDatabase{
         variableToValueMap.put(variableName, values);
     }
 
+    /***
+     * Return the value of the variable by looking it up in a HashMap.
+     * O(c) (constant) with respect to the number of items in the database
+     *
+     * @param variableName
+     * @return
+     */
     public GetResult get(String variableName){
 
         if(variableToValueMap.containsKey(variableName)){
@@ -117,12 +155,27 @@ public class SimpleDatabase{
         }
     }
 
-
+    /***
+     * Set the value to null in both data structures
+     * O(log n) with respect to the number of items in the database.
+     *
+     * @param variableName
+     */
     public void unset(String variableName) {
         unsetValueToVariableMap(variableName); //Do this first, because it has a dependency on variableToValueMap data
         unsetVariableToValueMap(variableName);
     }
 
+    /***
+     * Set the value to null in valueToVariable map.
+     * O(log n) with respect to the number of items in the database, because it must lookup the value in the TreeMap
+     *
+     * Note: at worst case this is linear with respect to the number of open transactions, because it may need to push
+     * a value onto the stack for each previous transaction where the variables were not touched. The number of
+     *  open transactions is assumed to be small.
+     *
+     * @param variableName
+     */
     private void unsetValueToVariableMap(String variableName) {
         GetResult getResult = get(variableName);
         if ((getResult.toString().equals("NULL"))){
@@ -141,6 +194,16 @@ public class SimpleDatabase{
         }
     }
 
+    /***
+     * Set the value to null in the variableToValue map.
+     * O(c) with respect to the number of items in the database, because it fetches the value using a hashMap.
+     *
+     *  Note: at worst case this is linear with respect to the number of open transactions,because it may need to
+     *  push a value onto the stack for each previous transaction where the value was not touched. The number of
+     *  open transactions is assumed to be small.
+     *
+     * @param variableName
+     */
     private void unsetVariableToValueMap(String variableName) {
         Stack<Integer> values = variableToValueMap.get(variableName);
         if (values != null){
@@ -157,6 +220,12 @@ public class SimpleDatabase{
         }
     }
 
+    /***
+     * Return the number of variables whose value equals the Integer passed in.
+     * O(log n) because valueToVariable map is a TreeMap (Red-black binary search tree)
+     * @param valueToFind
+     * @return
+     */
     public Integer numEqualTo(Integer valueToFind){
         Stack<ArrayList<String>> arrayLists = valueToVariableMap.get(valueToFind);
         if (arrayLists != null){
@@ -168,10 +237,17 @@ public class SimpleDatabase{
 
     }
 
+    /***
+     * Increment the transaction count
+     */
     public void begin(){
         transactionCount++;
     }
 
+    /***
+     * Rollback the most recent uncommitted operation in both data structures
+     * O(2n) with respect to the number of items in the database
+     */
     public void rollback(){
         if (transactionCount == 0){
             System.out.println("NO TRANSACTION");
@@ -182,6 +258,12 @@ public class SimpleDatabase{
         }
     }
 
+    /***
+     * Rollback the most recent uncommitted operation in the valueToVariable map.
+     * O(n) with respect to the number of values in the database.
+     *
+     * Iterate over all of the keys, pop off the ArrayList if uncommitted values are found
+     */
     private void rollbackValueToVariableMap() {
         for(Integer value : valueToVariableMap.keySet()){
             Stack<ArrayList<String>> variablesWithValue = valueToVariableMap.get(value);
@@ -191,6 +273,12 @@ public class SimpleDatabase{
         }
     }
 
+    /***
+     * Rollback the most recent uncommitted changes in the variableToValue map.
+     * O(n) with respect to the number of items in the database
+     *
+     * Iterate over all of the keys, pop off the stack if an uncommitted value is found
+     */
     private void rollbackVariableToValueMap() {
         for(String variable : variableToValueMap.keySet()){
             Stack<Integer> values = variableToValueMap.get(variable);
@@ -200,6 +288,10 @@ public class SimpleDatabase{
         }
     }
 
+    /***
+     * Commit the values set in the most recent transaction to both data structures
+     * O(2n) with respect to the number of items in the database
+     */
     public void commit(){
         if (transactionCount == 0){
             System.out.println("NO TRANSACTION");
@@ -210,6 +302,13 @@ public class SimpleDatabase{
         }
     }
 
+    /***
+     * Commit all uncommitted changes in the valueToVariable map
+     * O(n) with respect to the number of items in the database
+     *
+     * Iterate over the keySet(). The ArrayList found at the top of the stack for each value is used as the seed for a
+     * new Stack for each value.
+     */
     private void commitValueToVariableMap() {
         for(Integer value : valueToVariableMap.keySet()){
             Stack<ArrayList<String>> committedValues = new Stack<ArrayList<String>>();
@@ -219,6 +318,13 @@ public class SimpleDatabase{
         }
     }
 
+    /***
+     * Commit all uncommitted changes in the variableToValue map
+     * O(n) with respect to the number of items in the database
+     *
+     * Iterate over the keySet(). The last value on the stack (if not null) is used as the seed for a new stack for each
+     * variable.
+     */
     private void commitVariableToValueMap() {
         for(String key : variableToValueMap.keySet()){
             Stack<Integer> valuesForKey = variableToValueMap.get(key);
@@ -234,6 +340,9 @@ public class SimpleDatabase{
         }
     }
 
+    /***
+     * Wrapper class for Database Get result
+     */
     public class GetResult{
 
         private Integer myVal;
@@ -242,9 +351,7 @@ public class SimpleDatabase{
             myVal = val;
         }
 
-        GetResult(){
-
-        }
+        GetResult(){}
 
         @Override
         public String toString() {
